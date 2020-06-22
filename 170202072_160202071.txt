@@ -1,0 +1,218 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace ThrC
+{
+    public partial class Form1 : Form
+    {
+        public Form1()
+        {
+            InitializeComponent();
+        }
+        public Thread t1;
+        public Thread t2;
+        public bool dongu = true;
+        public int AnaDeger, altdeger,cevap;
+        public int[] deger = new int[13];
+        public object anaistek;
+        public object[] alt = new object[13];
+        public object[] altc = new object[13];
+        public bool[] calis = new bool[13];
+        int aktifSnc = 0;
+
+        private void btnStart_Click(object sender, EventArgs e)
+        {
+            dongu = true;
+            calis[1] = true;
+            calis[2] = true;
+            yenisunucuekle(1,0);
+            Thread.Sleep(375);
+            yenisunucuekle(2,0);
+            for (int z = 3; z <= 12; z++)
+            {
+                if (deger[z] > 0)
+                    yenisunucuekle(z,deger[z]);
+            }
+            int gelenis;
+            while (dongu)
+            {
+                Random rnd = new Random();
+                gelenis = rnd.Next(1, 100);
+                this.Refresh();
+                if (AnaDeger > 0)
+                    ProgressBar1.Value = AnaDeger;
+                Label2.Text = AnaDeger.ToString();
+                aktifSnc = 0;
+                Label8.Text = altdeger.ToString();
+                Label9.Text = (int.Parse(Label9.Text) + gelenis).ToString();
+                lock (anaistek)
+                {
+                    AnaDeger += gelenis;
+                    Console.WriteLine(DateTime.Now + " AnaIs +: " + gelenis + " ---Anadeger:" + AnaDeger);
+                }
+                foreach (Sunucu pbr in flowLayoutPanel1.Controls )
+                {
+                    if(calis[int.Parse(pbr.Tag.ToString())]==true)
+                    {
+                        
+                        aktifSnc += 1;
+                        pbr.progressBar1.Value = deger[int.Parse(pbr.Tag.ToString())];
+                        pbr.label1.Text = deger[int.Parse(pbr.Tag.ToString())].ToString();
+
+                        if (pbr.Visible == false)
+                            pbr.Visible = true;
+
+                    }
+                    else
+                    {
+                        pbr.Visible = false;
+                    }
+                }
+                label4.Text = cevap.ToString();
+                label13.Text = aktifSnc.ToString();
+                Thread.Sleep(500);
+                
+                Application.DoEvents();
+            }
+        }
+
+        private void Button1_Click(object sender, EventArgs e)
+        {
+            dongu = false;
+            for (int i = 1; i <= 12; i++)
+                calis[i] = false;
+             
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            anaistek = new object();
+            calis[1] = false;
+            calis[2] = false;
+
+            for (int i = 1; i <= 12; i++)
+             {
+                 Sunucu pbr = new Sunucu();
+                 pbr.Size = new Size(220, 14);
+                 pbr.Visible = false;
+                 pbr.Tag = i.ToString();
+             
+                flowLayoutPanel1.Controls.Add(pbr);
+             }
+
+
+
+
+        }
+
+        private void EThread1Work(object data)
+        {
+            int index =Convert.ToInt32(data);
+            alt[index] = new object();
+            while (calis[index])
+            {
+                Random rnd = new Random();
+                int i = rnd.Next(1, 50);
+                lock (alt[index])
+                {
+                    if (AnaDeger > i)
+                    {
+                        deger[index] += i;
+                        AnaDeger -= i;
+                        altdeger += i;
+                    }
+                    Console.WriteLine(DateTime.Now + " ETH Sub" + index + " :" + deger[index] + " Eklenen:" + i);
+                    if (deger[index] >= 3500)
+                    {
+                         
+                        deger[index]=deger[index]/2;
+                        yenisunucuekle(0,deger[index]);
+                    }
+                }
+                Thread.Sleep(500);
+            }
+        }
+
+        private void CThread1Work(object data)
+        {
+            int index = Convert.ToInt32(data);
+            altc[index] = new object();
+            while (calis[index])
+            {
+                lock (altc[index])
+                {
+                    Random rnd = new Random();
+                    int i = rnd.Next(1, 50);
+                    if (i > deger[index])
+                    {
+                        i = deger[index];
+                        if (index > 2)
+                            calis[index] = false;
+                    }
+                    deger[index] -= i;
+                    cevap += i;
+                    Console.WriteLine(DateTime.Now + " CTH Sub" + index + ": " + deger[index] + " Cevaplanan:" + i);
+                    
+                }
+                Thread.Sleep(300);
+            }
+            MessageBox.Show(index.ToString() + " Sunucu Kapandı", "Thread" + index.ToString());
+        }
+
+      
+
+        private void Button3_Click(object sender, EventArgs e)
+        {
+            if(deger[1] < 4000)
+            deger[1] += 1000;
+        }
+
+        private void Button4_Click(object sender, EventArgs e)
+        {
+            if(deger[2]<4000)
+            deger[2] += 1000;
+
+        }
+
+        private void Button2_Click(object sender, EventArgs e)
+        {
+            AnaDeger += 1000;
+            int yenideger;
+            yenideger = int.Parse(Label9.Text) + 1000;
+            Label9.Text = yenideger.ToString();
+        }
+
+        private void yenisunucuekle(int index,int yenideger)
+        {
+            if (index == 0)
+            {
+                for (int z = 3; z <= 12; z++)
+                {
+                    if (calis[z] == false)
+                    {
+                        index = z; break;
+                    }
+                }
+               
+               deger[index]+=yenideger;
+            }
+            if (index == 0)
+                return;
+            Thread c1 = new Thread(EThread1Work);
+            Thread c2 = new Thread(CThread1Work);
+            calis[index] = true;
+            c1.Name = "E_Thread " + index;
+            c2.Name = "C_Thread " + index;
+            c1.Start(index);
+            c2.Start(index);
+        }
+    }
+}
